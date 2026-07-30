@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Ted 工作台</title>
+<meta name="theme-color" content="#0a0e1a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+
+<!-- 未授權畫面 -->
+<div id="gate" class="gate" hidden>
+  <div class="gate-card">
+    <h1>Ted 工作台</h1>
+    <p class="gate-lead">這個網頁本身沒有資料。待辦內容存在私有 repo，需要一組授權碼才讀得到。</p>
+    <ol class="gate-steps">
+      <li>去 <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Fine-grained token</a></li>
+      <li>Repository access 選 <b>Only select repositories</b> → 勾 <code id="gate-repo"></code></li>
+      <li>Permissions → Repository permissions → <b>Contents</b> 設成 <b>Read and write</b></li>
+      <li>產生後貼到下面（只存在這台裝置的瀏覽器，不會上傳到任何地方）</li>
+    </ol>
+    <input id="gate-token" type="password" placeholder="github_pat_..." autocomplete="off" spellcheck="false">
+    <button id="gate-go" class="btn btn-primary">進入</button>
+    <p id="gate-err" class="gate-err" hidden></p>
+  </div>
+</div>
+
+<!-- 主畫面 -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-row">
+      <div>
+        <h1 class="brand">工作台</h1>
+        <p class="today" id="today"></p>
+      </div>
+      <div class="topbar-right">
+        <span id="sync" class="sync sync-ok">已同步</span>
+        <button id="btn-reload" class="btn btn-ghost" title="重新載入">↻</button>
+        <button id="btn-menu" class="btn btn-ghost" title="設定">⋯</button>
+      </div>
+    </div>
+    <nav class="filters" id="filters">
+      <button class="chip is-active" data-filter="focus">聚焦</button>
+      <button class="chip" data-filter="quick">30 分鐘清得掉</button>
+      <button class="chip" data-filter="mine">卡在我</button>
+      <button class="chip" data-filter="open">全部未完成</button>
+      <button class="chip" data-filter="all">全部</button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section id="sec-gates" class="section"></section>
+    <section id="sec-quick" class="section"></section>
+    <section id="sec-widgets" class="section"></section>
+    <section id="sec-projects" class="section"></section>
+  </main>
+
+  <div id="menu" class="sheet" hidden>
+    <div class="sheet-card">
+      <h2>設定</h2>
+      <p class="muted" id="menu-meta"></p>
+      <button id="btn-export" class="btn btn-ghost">複製整份 JSON</button>
+      <button id="btn-forget" class="btn btn-danger">清除這台裝置的授權碼</button>
+      <button id="btn-close" class="btn btn-ghost">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
