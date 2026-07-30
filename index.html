@@ -5,9 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Ted 工作台</title>
-<meta name="theme-color" content="#0a0e1a">
+<meta name="theme-color" content="#eef2f8">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="assets/app.css">
+<script>
+// 在畫面繪製前就決定主題，避免開啟瞬間閃一下白
+(function(){
+  var pref = new URLSearchParams(location.search).get('theme') || localStorage.getItem('ted-dash-theme') || 'auto';
+  var dark = pref === 'dark' || (pref === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name=theme-color]').content = dark ? '#151c2b' : '#eef2f8';
+})();
+</script>
+<link rel="stylesheet" href="assets/app.css?v=2">
 </head>
 <body>
 
@@ -61,6 +70,12 @@
   <div id="menu" class="sheet" hidden>
     <div class="sheet-card">
       <h2>設定</h2>
+      <p class="muted" style="margin:0">外觀</p>
+      <div class="seg" id="theme-seg">
+        <button data-theme="auto">自動</button>
+        <button data-theme="light">淺色</button>
+        <button data-theme="dark">深色</button>
+      </div>
       <p class="muted" id="menu-meta"></p>
       <button id="btn-export" class="btn btn-ghost">複製整份 JSON</button>
       <button id="btn-forget" class="btn btn-danger">清除這台裝置的授權碼</button>
@@ -69,6 +84,6 @@
   </div>
 </div>
 
-<script src="assets/app.js"></script>
+<script src="assets/app.js?v=2"></script>
 </body>
 </html>

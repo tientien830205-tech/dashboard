@@ -26,7 +26,28 @@ const state = {
   filter: new URLSearchParams(location.search).get('f') || 'focus',
   open: new Set(JSON.parse(localStorage.getItem(LS_OPEN) || '[]')),
   widgets: {},
+  gatesExpanded: false,
+  quickExpanded: false,
 };
+
+/* ---------- 主題（自動／淺／深） ---------- */
+const LS_THEME = 'ted-dash-theme';
+const GATES_FOLD = 4;   // 聚焦模式先只顯示這幾個死線，其餘收起來
+const QUICK_FOLD = 6;   // 同理，快清清單先露出最省時的幾件
+
+function applyTheme() {
+  // ?theme=light|dark 可暫時覆蓋（截圖驗版面用）
+  const pref = new URLSearchParams(location.search).get('theme') || localStorage.getItem(LS_THEME) || 'auto';
+  const dark = pref === 'dark' || (pref === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const meta = document.querySelector('meta[name=theme-color]');
+  if (meta) meta.content = dark ? '#151c2b' : '#eef2f8';
+  const seg = document.getElementById('theme-seg');
+  if (seg) [...seg.children].forEach(b => b.classList.toggle('is-active', b.dataset.theme === pref));
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if ((localStorage.getItem(LS_THEME) || 'auto') === 'auto') applyTheme();
+});
 
 /* ---------- utils ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -239,8 +260,11 @@ function renderGates() {
   const head = el('div', 'sec-head');
   head.append(el('h2', null, '🔴 死線'), el('span', 'count', `${list.length} 個`));
   sec.append(head);
+  // 手機上一次列十張卡要滑很久，聚焦模式先摺起來
+  const foldable = state.filter === 'focus' && list.length > GATES_FOLD;
+  const shown = foldable && !state.gatesExpanded ? list.slice(0, GATES_FOLD) : list;
   const box = el('div', 'gates');
-  list.forEach(g => {
+  shown.forEach(g => {
     const n = daysUntil(g.date);
     const r = el('div', `gate-row sev-${g.severity || 'info'}${n < 0 ? ' is-past' : ''}`);
     const d = el('div', 'gate-d');
@@ -252,6 +276,13 @@ function renderGates() {
     box.append(r);
   });
   sec.append(box);
+  if (foldable) {
+    const more = el('button', 'more', state.gatesExpanded
+      ? '收起 ▴'
+      : `還有 ${list.length - GATES_FOLD} 個死線 ▾`);
+    more.onclick = () => { state.gatesExpanded = !state.gatesExpanded; renderGates(); };
+    sec.append(more);
+  }
 }
 
 function renderQuick() {
@@ -272,9 +303,17 @@ function renderQuick() {
   sec.append(head);
   if (!mine) sec.append(el('p', 'sec-note', '都是別人在等你、或你一按就完成的事。'));
   if (!rows.length) { sec.append(el('div', 'empty', '清光了。')); return; }
+  // 聚焦模式只露出最快能清掉的幾件，其餘收起來（不然專案卡被推到很下面）
+  const foldable = state.filter === 'focus' && rows.length > QUICK_FOLD;
+  const shown = foldable && !state.quickExpanded ? rows.slice(0, QUICK_FOLD) : rows;
   const box = el('div', 'flat');
-  rows.forEach(([p, it]) => box.append(itemRow(p, it, true)));
+  shown.forEach(([p, it]) => box.append(itemRow(p, it, true)));
   sec.append(box);
+  if (foldable) {
+    const more = el('button', 'more', state.quickExpanded ? '收起 ▴' : `還有 ${rows.length - QUICK_FOLD} 件 ▾`);
+    more.onclick = () => { state.quickExpanded = !state.quickExpanded; renderQuick(); };
+    sec.append(more);
+  }
 }
 
 function renderWidgets() {
@@ -441,6 +480,7 @@ function render() {
 
 /* ---------- boot ---------- */
 async function boot() {
+  applyTheme();
   $('#gate-repo').textContent = `${CFG.owner}/${CFG.repo}`;
   if (!state.token && !LOCAL) return showGate();
   try {
@@ -496,6 +536,12 @@ $('#btn-menu').onclick = () => {
   $('#menu').hidden = false;
 };
 $('#btn-close').onclick = () => { $('#menu').hidden = true; };
+$('#theme-seg').onclick = e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  localStorage.setItem(LS_THEME, b.dataset.theme);
+  applyTheme();
+};
 $('#btn-export').onclick = async () => {
   await navigator.clipboard.writeText(JSON.stringify(state.doc, null, 2));
   $('#btn-export').textContent = '已複製 ✓';
