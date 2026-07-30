@@ -131,7 +131,11 @@ function applyOp(doc, op) {
   switch (op.type) {
     case 'toggle': {
       const it = p && (p.items || []).find(i => i.id === op.itemId);
-      if (it) it.done = op.done;
+      if (it) {
+        it.done = op.done;
+        if (op.done) it.completedAt = todayISO();
+        else delete it.completedAt;
+      }
       break;
     }
     case 'addItem':
@@ -229,6 +233,25 @@ function itemTags(it) {
   return wrap.children.length ? wrap : null;
 }
 
+function buildPrompt(proj, it) {
+  const track = (state.doc.tracks || []).find(t => t.id === proj.track);
+  return `接續處理這個待辦事項：\n\n專案：${proj.name}${track ? `（${track.label}）` : ''}\n事項：${it.text}${it.note ? `\n備註：${it.note}` : ''}\n\n（來源：工作台 project=${proj.id} item=${it.id}）\n\n做完之後：口頭跟我說「這件事完成了」，並直接幫我更新 dashboard-data/todos.json（該項目 done 設 true）、commit push，不用再另外跟我確認。`;
+}
+
+async function copyPrompt(proj, it, btn) {
+  const text = buildPrompt(proj, it);
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    prompt('複製失敗，手動複製這段貼給我：', text);
+    return;
+  }
+  const orig = btn.textContent;
+  btn.textContent = '已複製 ✓';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+}
+
 function itemRow(proj, it, showWhere) {
   const row = el('div', 'item' + (it.done ? ' is-done' : ''));
   const cb = el('button', 'cb', '✓');
@@ -240,17 +263,24 @@ function itemRow(proj, it, showWhere) {
   const tags = itemTags(it);
   if (tags) main.append(tags);
   if (it.note) main.append(el('div', 'it-note', it.note));
+  row.append(cb, main);
+  if (!it.done) {
+    const copy = el('button', 'it-copy', '📋');
+    copy.title = '複製成給 Claude 的 prompt';
+    copy.onclick = () => copyPrompt(proj, it, copy);
+    row.append(copy);
+  }
   const del = el('button', 'it-del', '×');
   del.title = '刪除';
   del.onclick = () => { if (confirm(`刪掉「${it.text.slice(0, 30)}…」？`)) pushOp({ type: 'delItem', projectId: proj.id, itemId: it.id }); };
-  row.append(cb, main, del);
+  row.append(del);
   return row;
 }
 
 function renderGates() {
   const sec = $('#sec-gates');
   sec.innerHTML = '';
-  if (state.filter === 'quick' || state.filter === 'mine') return;
+  if (['quick', 'mine', 'history'].includes(state.filter)) return;
   const all = (state.doc.gates || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   // 聚焦只看 4 個月內的（更遠的在「全部」才出現，不然每天都被 2028 的事洗版）
   const list = state.filter === 'focus'
@@ -376,7 +406,7 @@ function statusPill(p) {
 function renderProjects() {
   const sec = $('#sec-projects');
   sec.innerHTML = '';
-  if (['quick', 'mine'].includes(state.filter)) return;
+  if (['quick', 'mine', 'history'].includes(state.filter)) return;
   const showDone = state.filter === 'all';
   const focusTracks = ['cash', 'evidence', 'bni'];
   const tracks = (state.doc.tracks || []).filter(t => state.filter !== 'focus' || focusTracks.includes(t.id));
@@ -468,6 +498,67 @@ function renderProjects() {
   }
 }
 
+function renderHistory() {
+  const sec = $('#sec-history');
+  sec.innerHTML = '';
+  if (state.filter !== 'history') return;
+
+  const tracks = state.doc.tracks || [];
+  const projects = state.doc.projects || [];
+  const head = el('div', 'sec-head');
+  head.append(el('h2', null, '📜 完成紀錄'));
+  sec.append(head);
+  sec.append(el('p', 'sec-note', '照專案分開，點開看完成日期的時間軸。'));
+
+  let totalDone = 0;
+  tracks.forEach(t => {
+    const group = projects
+      .filter(p => p.track === t.id)
+      .map(p => ({ p, items: (p.items || []).filter(i => i.done).sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || '')) }))
+      .filter(x => x.items.length);
+    if (!group.length) return;
+    const trackCount = group.reduce((a, x) => a + x.items.length, 0);
+    totalDone += trackCount;
+
+    const tKey = 'h-' + t.id;
+    const tWrap = el('div', 'hist-track' + (state.open.has(tKey) ? ' is-open' : ''));
+    const tHead = el('button', 'hist-track-head');
+    tHead.append(el('span', 'ic', t.icon || '•'), el('span', null, t.label), el('span', 'count', `${trackCount} 件`), el('span', 'caret', '▶'));
+    tHead.onclick = () => {
+      state.open.has(tKey) ? state.open.delete(tKey) : state.open.add(tKey);
+      localStorage.setItem(LS_OPEN, JSON.stringify([...state.open]));
+      renderHistory();
+    };
+    tWrap.append(tHead);
+
+    const pBox = el('div', 'hist-projects');
+    group.forEach(({ p, items }) => {
+      const pKey = 'h-' + p.id;
+      const pWrap = el('div', 'hist-project' + (state.open.has(pKey) ? ' is-open' : ''));
+      const pHead = el('button', 'hist-project-head');
+      pHead.append(el('span', null, p.name), el('span', 'count', `${items.length} 件`), el('span', 'caret', '▶'));
+      pHead.onclick = () => {
+        state.open.has(pKey) ? state.open.delete(pKey) : state.open.add(pKey);
+        localStorage.setItem(LS_OPEN, JSON.stringify([...state.open]));
+        renderHistory();
+      };
+      pWrap.append(pHead);
+      const tl = el('div', 'timeline');
+      items.forEach(it => {
+        const row = el('div', 'tl-row');
+        row.append(el('div', 'tl-date', it.completedAt || '日期不明'), el('div', 'tl-text', it.text));
+        tl.append(row);
+      });
+      pWrap.append(tl);
+      pBox.append(pWrap);
+    });
+    tWrap.append(pBox);
+    sec.append(tWrap);
+  });
+
+  if (!totalDone) sec.append(el('div', 'empty', '還沒有完成紀錄——事項標完成之後會自動出現在這裡。'));
+}
+
 function render() {
   const d = state.doc;
   const nOpen = (d.projects || []).reduce((a, p) => a + (p.items || []).filter(i => !i.done).length, 0);
@@ -476,6 +567,7 @@ function render() {
   renderQuick();
   renderWidgets();
   renderProjects();
+  renderHistory();
 }
 
 /* ---------- boot ---------- */
