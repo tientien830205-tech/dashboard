@@ -32,7 +32,7 @@ const state = {
 
 /* ---------- 主題（自動／淺／深） ---------- */
 const LS_THEME = 'ted-dash-theme';
-const GATES_FOLD = 4;   // 聚焦模式先只顯示這幾個死線，其餘收起來
+const GATES_FOLD = 4;   // 聚焦模式先只顯示這幾個截止日，其餘收起來
 const QUICK_FOLD = 6;   // 同理，快清清單先露出最省時的幾件
 
 function applyTheme() {
@@ -252,6 +252,20 @@ async function copyPrompt(proj, it, btn) {
   setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
 }
 
+async function copyGatePrompt(g, btn) {
+  const text = `接續處理這個截止日相關的工作：\n\n事項：${g.label}\n日期：${g.date}${g.note ? `\n備註：${g.note}` : ''}\n\n（來源：工作台截止日 id=${g.id}）\n\n做完之後：口頭跟我說「這件事完成了」，如果這個截止日已經沒用了（事情做完或過期），也直接幫我把它從 dashboard-data/todos.json 的 gates 裡刪掉、commit push，不用再另外跟我確認。`;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    prompt('複製失敗，手動複製這段貼給我：', text);
+    return;
+  }
+  const orig = btn.textContent;
+  btn.textContent = '已複製 ✓';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+}
+
 function itemRow(proj, it, showWhere) {
   const row = el('div', 'item' + (it.done ? ' is-done' : ''));
   const cb = el('button', 'cb', '✓');
@@ -288,7 +302,7 @@ function renderGates() {
     : state.filter === 'all' ? all : all.filter(g => daysUntil(g.date) >= -14);
   if (!list.length) return;
   const head = el('div', 'sec-head');
-  head.append(el('h2', null, '🔴 死線'), el('span', 'count', `${list.length} 個`));
+  head.append(el('h2', null, '🔴 截止日'), el('span', 'count', `${list.length} 個`));
   sec.append(head);
   // 手機上一次列十張卡要滑很久，聚焦模式先摺起來
   const foldable = state.filter === 'focus' && list.length > GATES_FOLD;
@@ -303,13 +317,17 @@ function renderGates() {
     body.append(el('div', 'lb', g.label));
     body.append(el('div', 'nt', g.note ? `${g.date}・${g.note}` : g.date));
     r.append(d, body);
+    const copy = el('button', 'gate-copy', '📋');
+    copy.title = '複製成給 Claude 的 prompt';
+    copy.onclick = () => copyGatePrompt(g, copy);
+    r.append(copy);
     box.append(r);
   });
   sec.append(box);
   if (foldable) {
     const more = el('button', 'more', state.gatesExpanded
       ? '收起 ▴'
-      : `還有 ${list.length - GATES_FOLD} 個死線 ▾`);
+      : `還有 ${list.length - GATES_FOLD} 個截止日 ▾`);
     more.onclick = () => { state.gatesExpanded = !state.gatesExpanded; renderGates(); };
     sec.append(more);
   }
@@ -443,7 +461,7 @@ function renderProjects() {
         const dl = el('button', 'deadline', `⏳ ${p.deadline}・${dayLabel(daysUntil(p.deadline))}`);
         dl.onclick = ev => {
           ev.stopPropagation();
-          const v = prompt('死線日期（YYYY-MM-DD，留空＝取消死線）', p.deadline || '');
+          const v = prompt('截止日期（YYYY-MM-DD，留空＝取消）', p.deadline || '');
           if (v !== null) pushOp({ type: 'setDeadline', projectId: p.id, date: v.trim() || null });
         };
         meta.append(dl);
