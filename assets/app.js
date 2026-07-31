@@ -562,6 +562,30 @@ function renderHistory() {
       };
       pWrap.append(pHead);
       const tl = el('div', 'timeline');
+      if (p.portfolio && (p.portfolio.url || (p.portfolio.images || []).length)) {
+        const pf = el('div', 'portfolio-row');
+        if (p.portfolio.url) {
+          const a = el('a', 'portfolio-link');
+          a.href = p.portfolio.url;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.textContent = '🔗 查看作品';
+          pf.append(a);
+        }
+        (p.portfolio.images || []).forEach(src => {
+          const a = el('a', 'portfolio-thumb');
+          a.href = src;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          const img = el('img');
+          img.src = src;
+          img.loading = 'lazy';
+          img.alt = p.name + ' 截圖';
+          a.append(img);
+          pf.append(a);
+        });
+        tl.append(pf);
+      }
       items.forEach(it => {
         const row = el('div', 'tl-row');
         row.append(el('div', 'tl-date', it.completedAt || '日期不明'), el('div', 'tl-text', it.text));

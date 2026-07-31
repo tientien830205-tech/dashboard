@@ -194,6 +194,11 @@ main{padding:20px 16px 0;max-width:900px;margin:0 auto}
 .hist-project.is-open .hist-project-head .caret{transform:rotate(90deg)}
 .timeline{display:none;padding:2px 14px 12px 22px}
 .hist-project.is-open .timeline{display:block}
+.portfolio-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 10px}
+.portfolio-link{font-size:12.5px;font-weight:600;color:var(--acc,#3b82f6);text-decoration:none;background:var(--bg3);border:1px solid var(--line);border-radius:20px;padding:5px 12px}
+.portfolio-link:active{background:var(--line)}
+.portfolio-thumb{display:block;width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--line);flex:0 0 auto}
+.portfolio-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .tl-row{position:relative;padding:7px 0 7px 16px;font-size:13px;border-left:2px solid var(--line)}
 .tl-row::before{content:"";position:absolute;left:-5px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--brand)}
 .tl-row:last-child{border-left-color:transparent}
