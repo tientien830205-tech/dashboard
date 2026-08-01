@@ -266,6 +266,20 @@ async function copyGatePrompt(g, btn) {
   setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
 }
 
+async function copyHandoffPrompt(p, btn) {
+  const text = `接手這個等待中的專案（客戶已回覆，恢復作業）：\n\n專案：${p.name}\n交接包：${p.handoff}\n\n（來源：工作台 project=${p.id}，目前 paused=true）\n\n開始作業時：先把 dashboard-data/todos.json 裡這個專案的 paused 改成 false（小卡片會自動回到快清清單）、commit push，再照交接包內容繼續，不用另外跟我確認。`;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    prompt('複製失敗，手動複製這段貼給我：', text);
+    return;
+  }
+  const orig = btn.textContent;
+  btn.textContent = '已複製 ✓';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+}
+
 function itemRow(proj, it, showWhere) {
   const row = el('div', 'item' + (it.done ? ' is-done' : ''));
   const cb = el('button', 'cb', '✓');
@@ -301,9 +315,12 @@ function renderToday() {
     .filter(g => { const n = daysUntil(g.date); return n !== null && n >= -14; })
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0] || null;
   const quick = [];
-  (state.doc.projects || []).forEach(p => (p.items || []).forEach(it => {
-    if (!it.done && it.owner === 'ted' && it.minutes != null && it.minutes <= 30) quick.push([p, it]);
-  }));
+  (state.doc.projects || []).forEach(p => {
+    if (p.paused) return;   // 等客戶回覆中的專案不出小卡片，交接包留在專案大卡上
+    (p.items || []).forEach(it => {
+      if (!it.done && it.owner === 'ted' && it.minutes != null && it.minutes <= 30) quick.push([p, it]);
+    });
+  });
   quick.sort((a, b) => (a[1].minutes || 999) - (b[1].minutes || 999));
   const picks = quick.slice(0, gate ? 2 : 3);
   const count = (gate ? 1 : 0) + picks.length;
@@ -379,6 +396,7 @@ function renderQuick() {
   // 照專案分組（組內快的在前），最快能清掉的專案排最上面
   const groups = [];
   (state.doc.projects || []).forEach(p => {
+    if (p.paused) return;   // 同 renderToday：暫停中的專案不進快清/卡在我
     const its = (p.items || []).filter(it =>
       !it.done && it.owner === 'ted' && (mine || (it.minutes != null && it.minutes <= 30)));
     if (!its.length) return;
@@ -495,8 +513,17 @@ function renderProjects() {
       const title = el('div', 'card-title');
       const nm = el('div', 'nm');
       nm.append(el('span', null, p.name), statusPill(p));
+      if (p.paused) nm.append(el('span', 'pill pill-paused', '⏸ 等回覆'));
       title.append(nm);
       if (p.summary) title.append(el('div', 'sm', p.summary));
+      if (p.paused && p.handoff) {
+        const ho = el('div', 'handoff');
+        ho.append(el('span', 'handoff-txt', `📦 ${p.handoff}`));
+        const copy = el('button', 'handoff-copy', '📋 複製交接包');
+        copy.onclick = ev => { ev.stopPropagation(); copyHandoffPrompt(p, copy); };
+        ho.append(copy);
+        title.append(ho);
+      }
       const meta = el('div', 'card-meta');
       const prog = el('div', 'prog');
       const bar = el('div', 'bar');
