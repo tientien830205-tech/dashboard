@@ -338,27 +338,37 @@ function renderQuick() {
   sec.innerHTML = '';
   if (!['focus', 'quick', 'mine'].includes(state.filter)) return;
   const mine = state.filter === 'mine';
-  const rows = [];
-  (state.doc.projects || []).forEach(p => (p.items || []).forEach(it => {
-    if (it.done) return;
-    if (it.owner !== 'ted') return;
-    if (!mine && !(it.minutes && it.minutes <= 30)) return;
-    rows.push([p, it]);
-  }));
-  rows.sort((a, b) => (a[1].minutes || 999) - (b[1].minutes || 999));
+  // 照專案分組（組內快的在前），最快能清掉的專案排最上面
+  const groups = [];
+  (state.doc.projects || []).forEach(p => {
+    const its = (p.items || []).filter(it =>
+      !it.done && it.owner === 'ted' && (mine || (it.minutes && it.minutes <= 30)));
+    if (!its.length) return;
+    its.sort((a, b) => (a.minutes || 999) - (b.minutes || 999));
+    groups.push([p, its]);
+  });
+  groups.sort((a, b) => (a[1][0].minutes || 999) - (b[1][0].minutes || 999));
+  const total = groups.reduce((n, [, its]) => n + its.length, 0);
   const head = el('div', 'sec-head');
-  head.append(el('h2', null, mine ? '🧍 卡在你身上' : '⚡ 30 分鐘內清得掉'), el('span', 'count', `${rows.length} 件`));
+  head.append(el('h2', null, mine ? '🧍 卡在你身上' : '⚡ 30 分鐘內清得掉'), el('span', 'count', `${total} 件`));
   sec.append(head);
   if (!mine) sec.append(el('p', 'sec-note', '都是別人在等你、或你一按就完成的事。'));
-  if (!rows.length) { sec.append(el('div', 'empty', '清光了。')); return; }
+  if (!total) { sec.append(el('div', 'empty', '清光了。')); return; }
   // 聚焦模式只露出最快能清掉的幾件，其餘收起來（不然專案卡被推到很下面）
-  const foldable = state.filter === 'focus' && rows.length > QUICK_FOLD;
-  const shown = foldable && !state.quickExpanded ? rows.slice(0, QUICK_FOLD) : rows;
+  const foldable = state.filter === 'focus' && total > QUICK_FOLD;
+  let budget = foldable && !state.quickExpanded ? QUICK_FOLD : Infinity;
   const box = el('div', 'flat');
-  shown.forEach(([p, it]) => box.append(itemRow(p, it, true)));
+  for (const [p, its] of groups) {
+    if (budget <= 0) break;
+    const gh = el('div', 'flat-ghead');
+    gh.append(el('span', 'gname', p.name), el('span', 'count', `${its.length} 件`));
+    box.append(gh);
+    its.slice(0, budget).forEach(it => box.append(itemRow(p, it, false)));
+    budget -= its.length;
+  }
   sec.append(box);
   if (foldable) {
-    const more = el('button', 'more', state.quickExpanded ? '收起 ▴' : `還有 ${rows.length - QUICK_FOLD} 件 ▾`);
+    const more = el('button', 'more', state.quickExpanded ? '收起 ▴' : `還有 ${total - QUICK_FOLD} 件 ▾`);
     more.onclick = () => { state.quickExpanded = !state.quickExpanded; renderQuick(); };
     sec.append(more);
   }
