@@ -293,6 +293,7 @@ function itemRow(proj, it, showWhere) {
 
 function renderToday() {
   const sec = $('#sec-today');
+  if (!sec) return;   // 舊版 index.html 還在快取裡時（沒有這個區塊）不要整頁炸掉
   sec.innerHTML = '';
   if (state.filter !== 'focus') return;
   // 最近的截止日 1 件＋最快清掉的 2 件，全部從既有資料算出來，不用手動維護
