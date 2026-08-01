@@ -291,6 +291,43 @@ function itemRow(proj, it, showWhere) {
   return row;
 }
 
+function renderToday() {
+  const sec = $('#sec-today');
+  sec.innerHTML = '';
+  if (state.filter !== 'focus') return;
+  // 最近的截止日 1 件＋最快清掉的 2 件，全部從既有資料算出來，不用手動維護
+  const gate = (state.doc.gates || [])
+    .filter(g => { const n = daysUntil(g.date); return n !== null && n >= -14; })
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0] || null;
+  const quick = [];
+  (state.doc.projects || []).forEach(p => (p.items || []).forEach(it => {
+    if (!it.done && it.owner === 'ted' && it.minutes != null && it.minutes <= 30) quick.push([p, it]);
+  }));
+  quick.sort((a, b) => (a[1].minutes || 999) - (b[1].minutes || 999));
+  const picks = quick.slice(0, gate ? 2 : 3);
+  const count = (gate ? 1 : 0) + picks.length;
+  if (!count) return;
+  const head = el('div', 'sec-head');
+  head.append(el('h2', null, `🎯 今天就這 ${count} 件`));
+  sec.append(head);
+  const box = el('div', 'today-card');
+  if (gate) {
+    const n = daysUntil(gate.date);
+    const r = el('div', 'today-gate' + (n < 0 ? ' is-past' : ''));
+    const b = el('div', 'it-main');
+    b.append(el('div', 'it-text', gate.label));
+    b.append(el('div', 'today-meta', `🔴 ${dayLabel(n)}・${gate.date}${gate.note ? `・${gate.note}` : ''}`));
+    r.append(b);
+    const copy = el('button', 'it-copy', '📋');
+    copy.title = '複製成給 Claude 的 prompt';
+    copy.onclick = () => copyGatePrompt(gate, copy);
+    r.append(copy);
+    box.append(r);
+  }
+  picks.forEach(([p, it]) => box.append(itemRow(p, it, true)));
+  sec.append(box);
+}
+
 function renderGates() {
   const sec = $('#sec-gates');
   sec.innerHTML = '';
@@ -342,7 +379,7 @@ function renderQuick() {
   const groups = [];
   (state.doc.projects || []).forEach(p => {
     const its = (p.items || []).filter(it =>
-      !it.done && it.owner === 'ted' && (mine || (it.minutes && it.minutes <= 30)));
+      !it.done && it.owner === 'ted' && (mine || (it.minutes != null && it.minutes <= 30)));
     if (!its.length) return;
     its.sort((a, b) => (a.minutes || 999) - (b.minutes || 999));
     groups.push([p, its]);
@@ -378,7 +415,8 @@ function renderWidgets() {
   const sec = $('#sec-widgets');
   sec.innerHTML = '';
   if (!['focus', 'all'].includes(state.filter)) return;
-  const ws = state.doc.widgets || [];
+  // 還沒接上資料源的不顯示（feeder 把 JSON 推上來就自動出現），佔位卡放著只會變雜訊
+  const ws = (state.doc.widgets || []).filter(w => state.widgets[w.id]);
   if (!ws.length) return;
   const head = el('div', 'sec-head');
   head.append(el('h2', null, '📊 我的工具'));
@@ -386,11 +424,9 @@ function renderWidgets() {
   const grid = el('div', 'wgrid');
   ws.forEach(w => {
     const data = state.widgets[w.id];
-    const card = el('div', 'widget' + (data ? '' : ' is-pending'));
-    card.append(el('h3', null, `${w.icon || '•'} ${data?.title || w.title}`));
-    if (!data) {
-      card.append(el('p', 'muted', w.pendingReason || '等資料源接上'));
-    } else {
+    const card = el('div', 'widget');
+    card.append(el('h3', null, `${w.icon || '•'} ${data.title || w.title}`));
+    {
       if (data.metrics?.length) {
         const m = el('div', 'wmetrics');
         data.metrics.forEach(x => {
@@ -615,6 +651,7 @@ function render() {
   const d = state.doc;
   const nOpen = (d.projects || []).reduce((a, p) => a + (p.items || []).filter(i => !i.done).length, 0);
   $('#today').textContent = `${todayISO()}・未完成 ${nOpen} 項・資料更新 ${(d.updated || '').slice(0, 16).replace('T', ' ')}`;
+  renderToday();
   renderGates();
   renderQuick();
   renderWidgets();
