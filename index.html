@@ -16,7 +16,7 @@
   document.querySelector('meta[name=theme-color]').content = dark ? '#151c2b' : '#eef2f8';
 })();
 </script>
-<link rel="stylesheet" href="assets/app.css?v=6">
+<link rel="stylesheet" href="assets/app.css?v=7">
 </head>
 <body>
 
@@ -53,6 +53,7 @@
     </div>
     <nav class="filters" id="filters">
       <button class="chip is-active" data-filter="focus">聚焦</button>
+      <button class="chip" data-filter="works">🔗 作品</button>
       <button class="chip" data-filter="quick">30 分鐘清得掉</button>
       <button class="chip" data-filter="mine">卡在我</button>
       <button class="chip" data-filter="open">全部未完成</button>
@@ -62,6 +63,7 @@
   </header>
 
   <main id="main">
+    <section id="sec-works" class="section"></section>
     <section id="sec-today" class="section"></section>
     <section id="sec-gates" class="section"></section>
     <section id="sec-quick" class="section"></section>
@@ -87,6 +89,6 @@
   </div>
 </div>
 
-<script src="assets/app.js?v=6"></script>
+<script src="assets/app.js?v=7"></script>
 </body>
 </html>

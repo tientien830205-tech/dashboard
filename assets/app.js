@@ -6,6 +6,7 @@ const CFG = {
   owner: 'tientien830205-tech',
   repo: 'dashboard-data',
   path: 'todos.json',
+  worksPath: 'works.json',   // 作品清單，跟 todos.json 分開兩個檔（寫入者不同，不要合併）
   branch: 'main',
   widgetDir: 'widgets',
 };
@@ -26,6 +27,8 @@ const state = {
   filter: new URLSearchParams(location.search).get('f') || 'focus',
   open: new Set(JSON.parse(localStorage.getItem(LS_OPEN) || '[]')),
   widgets: {},
+  works: undefined,      // undefined＝還沒載入，null＝載入失敗，物件＝有資料
+  worksErr: '',
   gatesExpanded: false,
   quickExpanded: false,
 };
@@ -218,6 +221,31 @@ async function loadWidgets() {
   renderWidgets();
 }
 
+/* ---------- 作品清單（works.json，跟待辦資料分開的一個檔） ---------- */
+async function loadWorks() {
+  if (state.worksLoading) return;
+  state.worksLoading = true;
+  try {
+    if (LOCAL) {
+      const r = await fetch(`../dashboard-data/${CFG.worksPath}?t=${Date.now()}`);
+      if (!r.ok) throw new Error(`本機讀取失敗 ${r.status}`);
+      state.works = await r.json();
+    } else {
+      const j = await gh(`${CFG.worksPath}?ref=${CFG.branch}&t=${Date.now()}`);
+      state.works = JSON.parse(b64dec(j.content));
+    }
+    state.worksErr = '';
+  } catch (e) {
+    // 讀不到就講出來，不要靜默顯示成「沒有作品」
+    state.works = null;
+    state.worksErr = e.notFound
+      ? `私有 repo 裡還沒有 ${CFG.worksPath}（推上去就會自動出現）`
+      : e.message;
+  }
+  state.worksLoading = false;
+  renderWorks();
+}
+
 /* ---------- render ---------- */
 function itemTags(it) {
   const wrap = el('div', 'it-sub');
@@ -305,6 +333,64 @@ function itemRow(proj, it, showWhere) {
   return row;
 }
 
+async function copyURL(url, btn) {
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch (e) {
+    prompt('複製失敗，手動複製這個網址：', url);
+    return;
+  }
+  const orig = btn.textContent;
+  btn.textContent = '已複製 ✓';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+}
+
+function renderWorks() {
+  const sec = $('#sec-works');
+  if (!sec) return;   // 舊版 index.html 還在快取裡時不要整頁炸掉
+  sec.innerHTML = '';
+  if (state.filter !== 'works') return;
+
+  const head = el('div', 'sec-head');
+  head.append(el('h2', null, '🔗 作品'));
+  sec.append(head);
+  sec.append(el('p', 'sec-note', '要開給客戶看的東西都在這。點卡片直接開，📋 複製網址貼 LINE。'));
+
+  // 第一次點進「作品」才去抓 works.json（平常打開工作台不浪費一次 API）
+  if (state.works === undefined) { loadWorks(); sec.append(el('div', 'empty', '載入中…')); return; }
+  if (state.works === null) { sec.append(el('div', 'empty', `讀不到作品清單：${state.worksErr}`)); return; }
+
+  const groups = (state.works.groups || []).filter(g => (g.items || []).length);
+  if (!groups.length) { sec.append(el('div', 'empty', '作品清單是空的。')); return; }
+
+  groups.forEach(g => {
+    const wrap = el('div', 'work-group');
+    const gh = el('div', 'work-ghead');
+    gh.append(el('span', 'ic', g.icon || '•'), el('span', null, g.label), el('span', 'count', `${g.items.length} 個`));
+    wrap.append(gh);
+    g.items.forEach(w => {
+      const card = el('div', 'work');
+      const a = el('a', 'work-open');
+      a.href = w.url; a.target = '_blank'; a.rel = 'noopener';
+      const nm = el('div', 'work-nm');
+      nm.append(el('span', null, w.name));
+      if (w.tag) nm.append(el('span', 'work-tag', w.tag));
+      a.append(nm);
+      if (w.desc) a.append(el('div', 'work-desc', w.desc));
+      a.append(el('div', 'work-url', w.url.replace(/^https:\/\//, '').replace(/\?.*$/, '')));
+      const copy = el('button', 'work-copy', '📋');
+      copy.title = '複製網址';
+      copy.onclick = ev => { ev.preventDefault(); copyURL(w.url, copy); };
+      card.append(a, copy);
+      wrap.append(card);
+    });
+    sec.append(wrap);
+  });
+
+  if (state.works.updated) sec.append(el('p', 'sec-note', `清單更新：${state.works.updated}。要增刪改 dashboard-data/works.json。`));
+}
+
 function renderToday() {
   const sec = $('#sec-today');
   if (!sec) return;   // 舊版 index.html 還在快取裡時（沒有這個區塊）不要整頁炸掉
@@ -349,7 +435,7 @@ function renderToday() {
 function renderGates() {
   const sec = $('#sec-gates');
   sec.innerHTML = '';
-  if (['quick', 'mine', 'history'].includes(state.filter)) return;
+  if (['quick', 'mine', 'history', 'works'].includes(state.filter)) return;
   const all = (state.doc.gates || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   // 聚焦只看 4 個月內的（更遠的在「全部」才出現，不然每天都被 2028 的事洗版）
   const list = state.filter === 'focus'
@@ -489,7 +575,7 @@ function statusPill(p) {
 function renderProjects() {
   const sec = $('#sec-projects');
   sec.innerHTML = '';
-  if (['quick', 'mine', 'history'].includes(state.filter)) return;
+  if (['quick', 'mine', 'history', 'works'].includes(state.filter)) return;
   const showDone = state.filter === 'all';
   const focusTracks = ['cash', 'evidence', 'bni'];
   const tracks = (state.doc.tracks || []).filter(t => state.filter !== 'focus' || focusTracks.includes(t.id));
@@ -679,6 +765,7 @@ function render() {
   const d = state.doc;
   const nOpen = (d.projects || []).reduce((a, p) => a + (p.items || []).filter(i => !i.done).length, 0);
   $('#today').textContent = `${todayISO()}・未完成 ${nOpen} 項・資料更新 ${(d.updated || '').slice(0, 16).replace('T', ' ')}`;
+  renderWorks();
   renderToday();
   renderGates();
   renderQuick();
