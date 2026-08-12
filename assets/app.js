@@ -550,6 +550,30 @@ function renderQuick() {
   }
 }
 
+// 通用圓環進度圖：widget 資料只要多帶一個 0-100 的 percent 欄位就會自動渲染，
+// 沒有這個欄位的既有卡片（finance-snapshot／line-quota）完全不受影響。
+function renderDonut(percent, id) {
+  const p = Math.max(0, Math.min(100, Number(percent) || 0));
+  const r = 24, c = 2 * Math.PI * r;
+  const dash = (p / 100) * c;
+  const gradId = `wdonut-grad-${String(id).replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  const wrap = el('div', 'wdonut-wrap');
+  wrap.innerHTML = `
+    <div class="wdonut">
+      <svg viewBox="0 0 60 60">
+        <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="var(--brand)"/>
+          <stop offset="100%" stop-color="var(--brand2)"/>
+        </linearGradient></defs>
+        <circle class="wdonut-track" cx="30" cy="30" r="${r}"/>
+        <circle class="wdonut-fill" cx="30" cy="30" r="${r}" stroke="url(#${gradId})"
+          stroke-dasharray="${dash.toFixed(2)} ${(c - dash).toFixed(2)}"/>
+      </svg>
+      <div class="wdonut-pct">${Math.round(p)}%</div>
+    </div>`;
+  return wrap;
+}
+
 function renderWidgets() {
   const sec = $('#sec-widgets');
   sec.innerHTML = '';
@@ -566,6 +590,9 @@ function renderWidgets() {
     const card = el('div', 'widget');
     card.append(el('h3', null, `${w.icon || '•'} ${data.title || w.title}`));
     {
+      if (typeof data.percent === 'number') {
+        card.append(renderDonut(data.percent, w.id));
+      }
       if (data.metrics?.length) {
         const m = el('div', 'wmetrics');
         data.metrics.forEach(x => {

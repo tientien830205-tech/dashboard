@@ -11,7 +11,9 @@
  *   DASH_TOKEN=xxx node feeder/push-widgets.mjs --dry     # 只印出會寫什麼，不上傳
  *
  * 加一個新工具卡片＝寫一支 collect 函式，回傳 widget 格式物件，然後加進 FEEDS。
- * widget 格式：{ title, updated, metrics:[{label,value}], lines:[string], link:{href,text} }
+ * widget 格式：{ title, updated, percent?:0-100, metrics:[{label,value}], lines:[string], link:{href,text} }
+ *   percent 是可選欄位：有給的話，前端會在卡片上多畫一個圓環進度圖（渲染邏輯見
+ *   dashboard/assets/app.js 的 renderDonut()），不影響沒有這個欄位的舊卡片。
  */
 
 import { readFile } from 'node:fs/promises';
@@ -36,14 +38,15 @@ async function collectFinance() {
   } catch {
     return null; // App v0.24 還沒部署到實機，或 iCloud 還沒同步下來
   }
-  const cur = snap.months?.[snap.months.length - 1] || {};
+  const months = snap.monthlySummary || [];
+  const cur = months[months.length - 1] || {};
   const metrics = [
     { label: '本月收入', value: `$${nt(cur.income ?? 0)}` },
     { label: '本月支出', value: `$${nt(cur.expense ?? 0)}` },
     { label: '本月淨額', value: `$${nt((cur.income ?? 0) - (cur.expense ?? 0))}` },
   ];
-  const lines = (cur.topCategories || []).slice(0, 4).map(c => `${c.name}　$${nt(c.amount)}`);
-  if (cur.baseline != null) lines.push(`基準線 $${nt(cur.baseline)}／一次性 $${nt(cur.oneOff ?? 0)}`);
+  const lines = (snap.topCategoriesThisMonth || []).slice(0, 4).map(c => `${c.name}　$${nt(c.amount)}`);
+  if (snap.baselineThisMonth != null) lines.push(`基準線 $${nt(snap.baselineThisMonth)}／一次性 $${nt(snap.oneOffThisMonth ?? 0)}`);
   return { title: '說了算 · 財務快照', updated: snap.generatedAt || nowLabel(), metrics, lines };
 }
 
