@@ -29,6 +29,7 @@ const state = {
   widgets: {},
   works: undefined,      // undefined＝還沒載入，null＝載入失敗，物件＝有資料
   worksErr: '',
+  thumbs: {},            // 縮圖快取：id → data URI（'' ＝抓過但失敗，不再重試）
   gatesExpanded: false,
   quickExpanded: false,
 };
@@ -246,6 +247,27 @@ async function loadWorks() {
   renderWorks();
 }
 
+// 縮圖放在私有 repo，沒辦法直接當 <img src>，要透過 API 取回 base64 再組成 data URI。
+// 抓好就塞進既有的 <img>，不整區重繪——重繪會把已經載好的圖again 洗掉。
+async function fillThumb(w, img) {
+  if (!w.thumb) return;
+  const hit = state.thumbs[w.id];
+  if (hit) { img.src = hit; img.classList.add('is-on'); return; }
+  if (hit === '') return;   // 抓過而且失敗，不再重試
+  try {
+    const uri = LOCAL
+      ? `../dashboard-data/${w.thumb}`
+      : `data:image/jpeg;base64,${String((await gh(`${w.thumb}?ref=${CFG.branch}`)).content).replace(/\s/g, '')}`;
+    state.thumbs[w.id] = uri;
+    // ⛔ 不要在這裡檢查 img.isConnected：LOCAL 模式沒有 await，
+    // 這個函式跑完時卡片還沒接進 DOM，檢查必定是 false → 圖永遠不出來（踩過）
+    img.src = uri;
+    img.classList.add('is-on');
+  } catch (e) {
+    state.thumbs[w.id] = '';   // 縮圖抓不到不算壞掉：維持灰底，文字跟連結照常可用
+  }
+}
+
 /* ---------- render ---------- */
 function itemTags(it) {
   const wrap = el('div', 'it-sub');
@@ -369,22 +391,34 @@ function renderWorks() {
     const gh = el('div', 'work-ghead');
     gh.append(el('span', 'ic', g.icon || '•'), el('span', null, g.label), el('span', 'count', `${g.items.length} 個`));
     wrap.append(gh);
+    const grid = el('div', 'work-grid');
     g.items.forEach(w => {
-      const card = el('div', 'work');
-      const a = el('a', 'work-open');
-      a.href = w.url; a.target = '_blank'; a.rel = 'noopener';
+      const card = el('a', 'work');
+      card.href = w.url; card.target = '_blank'; card.rel = 'noopener';
+
+      const shot = el('div', 'work-shot');
+      const img = el('img');
+      img.alt = w.name + ' 網站縮圖';
+      img.loading = 'lazy';
+      shot.append(img);
+      const copy = el('button', 'work-copy', '📋');
+      copy.title = '複製網址';
+      copy.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); copyURL(w.url, copy); };
+      shot.append(copy);
+      card.append(shot);
+      fillThumb(w, img);
+
+      const body = el('div', 'work-body');
       const nm = el('div', 'work-nm');
       nm.append(el('span', null, w.name));
       if (w.tag) nm.append(el('span', 'work-tag', w.tag));
-      a.append(nm);
-      if (w.desc) a.append(el('div', 'work-desc', w.desc));
-      a.append(el('div', 'work-url', w.url.replace(/^https:\/\//, '').replace(/\?.*$/, '')));
-      const copy = el('button', 'work-copy', '📋');
-      copy.title = '複製網址';
-      copy.onclick = ev => { ev.preventDefault(); copyURL(w.url, copy); };
-      card.append(a, copy);
-      wrap.append(card);
+      body.append(nm);
+      if (w.desc) body.append(el('div', 'work-desc', w.desc));
+      body.append(el('div', 'work-url', w.url.replace(/^https:\/\//, '').replace(/\?.*$/, '')));
+      card.append(body);
+      grid.append(card);
     });
+    wrap.append(grid);
     sec.append(wrap);
   });
 

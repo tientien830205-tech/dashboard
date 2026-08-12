@@ -233,17 +233,29 @@ main{padding:20px 16px 0;max-width:900px;margin:0 auto}
 }
 
 /* ---------- 作品區（🔗 作品頁籤）---------- */
-.work-group{margin-bottom:18px}
-.work-ghead{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;font-weight:700;color:var(--tx2);letter-spacing:.03em}
+.work-group{margin-bottom:22px}
+.work-ghead{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;font-weight:700;color:var(--tx2);letter-spacing:.03em}
 .work-ghead .ic{font-size:14px}
 .work-ghead .count{margin-left:auto;font-size:11px;font-weight:500;color:var(--tx3);font-variant-numeric:tabular-nums}
-.work{display:flex;align-items:stretch;gap:0;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--shadow);margin-bottom:8px;overflow:hidden;transition:border-color .15s}
-.work:hover{border-color:var(--line2)}
-.work-open{flex:1;min-width:0;display:block;padding:12px 4px 12px 14px;text-decoration:none;color:inherit}
-.work-nm{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:14.5px;font-weight:650;color:var(--tx)}
+
+.work-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:12px}
+.work{display:block;text-decoration:none;color:inherit;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;transition:border-color .15s,transform .15s}
+.work:hover{border-color:var(--brand);transform:translateY(-2px)}
+
+/* 縮圖：固定 16:10，載入前是灰底不是破圖，載好才淡入 */
+.work-shot{position:relative;aspect-ratio:16/10;background:var(--bg3);border-bottom:1px solid var(--line)}
+.work-shot img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block;opacity:0;transition:opacity .25s}
+.work-shot img.is-on{opacity:1}
+.work-copy{position:absolute;top:7px;right:7px;width:32px;height:32px;border-radius:9px;font-size:15px;line-height:1;
+  background:rgba(255,255,255,.86);color:#1b2334;backdrop-filter:blur(6px);
+  box-shadow:0 1px 4px rgba(0,0,0,.22);opacity:.62;transition:opacity .15s,background .15s}
+/* ⛔ 不要用 opacity:0 + hover 才顯示：手機沒有 hover，等於整個功能被藏起來 */
+.work:hover .work-copy,.work-copy:focus-visible{opacity:1}
+.work-copy:hover{background:#fff}
+.work-copy:disabled{opacity:1;width:auto;padding:0 9px;font-size:11.5px;font-weight:700;color:#1c6b4c;background:#fff;cursor:default}
+
+.work-body{padding:10px 12px 12px}
+.work-nm{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:14px;font-weight:650;line-height:1.45;color:var(--tx)}
 .work-tag{flex:none;font-size:10.5px;font-weight:600;line-height:1.5;padding:1px 7px;border-radius:999px;background:var(--bg3);color:var(--tx2);border:1px solid var(--line)}
-.work-desc{margin-top:3px;font-size:12.5px;line-height:1.6;color:var(--tx2)}
-.work-url{margin-top:4px;font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.work-copy{flex:none;width:52px;border-left:1px solid var(--line);font-size:17px;color:var(--tx3);transition:background .15s,color .15s}
-.work-copy:hover{background:var(--bg3);color:var(--tx)}
-.work-copy:disabled{font-size:11.5px;font-weight:600;color:var(--green);cursor:default;background:var(--bg3)}
+.work-desc{margin-top:4px;font-size:12.5px;line-height:1.6;color:var(--tx2)}
+.work-url{margin-top:6px;font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
